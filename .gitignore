@@ -1,0 +1,5 @@
+# configuration files ignore
+.envrc*
+
+# sample files ignore
+bulk_movies.json
