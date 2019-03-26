@@ -5,9 +5,7 @@ from elasticsearch.client import ClusterClient, IndicesClient, CatClient
 
 import requests
 
-host = 'search-movies-lhd34cp5ng4kxk6uxfmvacymte.us-east-1.es.amazonaws.com'
-path = '/my-index/_doc'
-url = host + path
+host = os.environ["HOST"]
 region = 'us-east-1'
 headers={'Content-Type': 'application/json'}
 awsauth = AWS4Auth(os.environ["ACCESS_KEY"], os.environ["SECRET_KEY"], region, 'es')
@@ -22,54 +20,55 @@ es = Elasticsearch(
     headers=headers#, sniff_on_start=True, sniffer_timeout=10
 )
 
-#
-# credentials = boto3.Session(
-#                         aws_access_key_id=os.environ["ACCESS_KEY"],
-#                         aws_secret_access_key=os.environ["SECRET_KEY"],
-#                         # aws_session_token=None,
-#                         region_name=region,
-#                         # botocore_session=None,
-#                         profile_name='rkatz-sandbox'
-#                 ).get_credentials()
-# awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, 'es')
-#
-# url = host + path
-
-# # The JSON body to accompany the request (if necessary)
-# payload = {
-#     "settings" : {
-#         "number_of_shards" : 7,
-#         "number_of_replicas" : 2
-#     }
-# }
-
-
-
-
-# curl -XPOST search-movies-lhd34cp5ng4kxk6uxfmvacymte.us-east-1.es.amazonaws.com/movies/_doc/1 -d '{"uid": "173",
-#"lastName": "ANGLO-CARIBBEAN CO., LTD.", "sdnType": "Entity", "programList": {"program": "CUBA"}, "akaList": {"aka": {"uid": "57", "type": "a.k.a.", "category": "strong", "lastName": "AVIA IMPORT"}}, "addressList": {"address": {"uid": "129", "address1": "Ibex House, The Minories", "city": "London", "postalCode": "EC3N 1DY", "country": "United Kingdom"}}}' -H 'Content-Type: application/json'
-
 def put_json(xml_file):
     with open(xml_file) as fd:
         doc = xmltodict.parse(fd.read())
-        sample = doc['sdnList']['sdnEntry']
+        sdn_xml = doc['sdnList']['sdnEntry']
         count = 0
-        while (count < 2):
-            data = json.dumps(sample[count]) + '\n'
-            # print ('######', data)
+        while (count < len(sdn_xml)):
+            data = json.dumps(sdn_xml[count]) + '\n'
             try:
                 es.index('ofac', '_doc', body=data, id=count) # how you index your document here
-                print (data)
             except TransportError as e:
                 print(e.info)
+            if count % 25 == 0:
+                print (count)
+                print (data)
             count = count + 1
 
 
-put_json('sdn.xml')
+# put_json('sdn.xml')
+catES = CatClient(es)
+o = catES.indices(['ofac'
+                    ],bytes = 'b', v=True)
+# print ('output... \n', o)
+
+this_dsl = '''
+    {
+      "query": {
+        "bool": {
+          "must": [
+            { "match": { "lastName": "CUBA"}}
+          ]
+        }
+      }
+    }
+    '''
+
+def ofac_search(dsl_body):
+    results = es.search(index='ofac', body=dsl_body, _source = True)
+    _len = results['hits']['total']
+    print (_len, 'hits....')
+    count = 0
+    while (count < _len):
+        print (count)
+        print (results['hits']['hits'][count])
+        count += 1
 
 
-
-
+ofac_search(this_dsl)
+# es.indices.delete(index='movies')
+# es.indices.delete(index='my-index')
 
 # es.IndicesClient.search(index='my-index')
 # es.cluster.health(wait_for_status='yellow', request_timeout=1)
