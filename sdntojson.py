@@ -1,9 +1,7 @@
-import xmltodict, json, boto3, os
+import xmltodict, json, os
 from requests_aws4auth import AWS4Auth
 from elasticsearch import Elasticsearch, RequestsHttpConnection, TransportError
-from elasticsearch.client import ClusterClient, IndicesClient, CatClient
-
-import requests
+from elasticsearch.client import CatClient
 
 host = os.environ["HOST"]
 region = 'us-east-1'
@@ -20,7 +18,8 @@ es = Elasticsearch(
     headers=headers#, sniff_on_start=True, sniffer_timeout=10
 )
 
-def put_json(xml_file):
+def iterate_xml(xml_file, state='dev'):
+
     with open(xml_file) as fd:
         doc = xmltodict.parse(fd.read())
         sdn_xml = doc['sdnList']['sdnEntry']
@@ -28,21 +27,20 @@ def put_json(xml_file):
         while (count < len(sdn_xml)):
             data = json.dumps(sdn_xml[count]) + '\n'
             try:
-                pass#   es.index('ofac', '_doc', body=data, id=count) # how you index your document here
+                if state='dev':
+                    pass
+                if state='prod':
+                    es.index('ofac', '_doc', body=data, id=count) # how you index your document here
             except TransportError as e:
                 print(e.info)
             if count % 100 == 0:
-                print (count)
+                print ('# ', count)
                 print (data)
             count = count + 1
-
-
-# put_json('sdn.xml')
-catES = CatClient(es)
-o = catES.indices(['ofac'
-                    ],bytes = 'b', v=True)
-# print ('output... \n', o)
-
+    catES = CatClient(es)
+    o = catES.indices(['ofac'
+                        ],bytes = 'b', v=True)
+    print ('current state... \n', o)
 
 
 def ofac_search(search_dict):
@@ -58,16 +56,12 @@ def ofac_search(search_dict):
             print (_len, 'hits....')
             count = 0
             while (count < _len):
-                print (results['hits']['hits'][count]['_source'])
+                print ('#', results['hits']['hits'][count]['_source'])
                 count += 1
 
 this_search_dict = {
  'lastName' : ['cuba'], 'uid': ['200'], 'all' : ['Nihombashi']
 }
-ofac_search(this_search_dict)
-# es.indices.delete(index='movies')
-# es.indices.delete(index='my-index')
 
-# es.IndicesClient.search(index='my-index')
-# es.cluster.health(wait_for_status='yellow', request_timeout=1)
-# es.analyze('movies')
+iterate_xml(os.environ["XML_FILE"])
+ofac_search(this_search_dict)
