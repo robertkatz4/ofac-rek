@@ -1,5 +1,6 @@
 # configuration files ignore
 .envrc*
+__pycache__
 
 # sample files ignore
 bulk_movies.json
