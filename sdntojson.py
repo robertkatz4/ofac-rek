@@ -28,10 +28,10 @@ def put_json(xml_file):
         while (count < len(sdn_xml)):
             data = json.dumps(sdn_xml[count]) + '\n'
             try:
-                es.index('ofac', '_doc', body=data, id=count) # how you index your document here
+                pass#   es.index('ofac', '_doc', body=data, id=count) # how you index your document here
             except TransportError as e:
                 print(e.info)
-            if count % 25 == 0:
+            if count % 100 == 0:
                 print (count)
                 print (data)
             count = count + 1
@@ -43,30 +43,28 @@ o = catES.indices(['ofac'
                     ],bytes = 'b', v=True)
 # print ('output... \n', o)
 
-this_dsl = '''
-    {
-      "query": {
-        "bool": {
-          "must": [
-            { "match": { "lastName": "CUBA"}}
-          ]
-        }
-      }
-    }
-    '''
-
-def ofac_search(dsl_body):
-    results = es.search(index='ofac', body=dsl_body, _source = True)
-    _len = results['hits']['total']
-    print (_len, 'hits....')
-    count = 0
-    while (count < _len):
-        print (count)
-        print (results['hits']['hits'][count])
-        count += 1
 
 
-ofac_search(this_dsl)
+def ofac_search(search_dict):
+    for key, value in search_dict.items():
+        for v in value:
+            if key == 'all':
+                search_json = "{\"query\":{\"query_string\":{\"query\":\"" + str(v) + "\"}}}"
+            else:
+                search_json = "{\"query\": {\"bool\": {\"must\": [{ \"match\": { \"" + str(key) + "\" : \"" + str(v) +  "\" }}]}}}"
+            print ('###', search_json)
+            results = es.search(index='ofac', body=search_json, _source = True)
+            _len = results['hits']['total']
+            print (_len, 'hits....')
+            count = 0
+            while (count < _len):
+                print (results['hits']['hits'][count]['_source'])
+                count += 1
+
+this_search_dict = {
+ 'lastName' : ['cuba'], 'uid': ['200'], 'all' : ['Nihombashi']
+}
+ofac_search(this_search_dict)
 # es.indices.delete(index='movies')
 # es.indices.delete(index='my-index')
 
